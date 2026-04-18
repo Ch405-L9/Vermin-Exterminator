@@ -1,70 +1,52 @@
-# Getting Started with Create React App
+# Vermin Infestation (Android)
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+`Vermin Infestation` is a mobile sniper shooter built with Unity URP where the player clears rat waves across generated barn layouts using scoped aim, recoil, and score-driven progression.
 
-## Available Scripts
+## Requirements
 
-In the project directory, you can run:
+- Unity `2023 LTS`
+- Universal Render Pipeline (URP) package enabled
+- Android Build Support module installed (SDK/NDK/OpenJDK via Unity Hub)
 
-### `npm start`
+## Open Project
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+1. Open Unity Hub.
+2. Add this folder as a Unity project.
+3. Open with Unity 2023 LTS.
+4. Ensure scenes exist and are added to Build Settings:
+   - `Assets/Scenes/MainMenu.unity`
+   - `Assets/Scenes/Game.unity`
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## Android Build Setup
 
-### `npm test`
+1. Open `File > Build Settings`.
+2. Select `Android` and click `Switch Platform`.
+3. Open `Player Settings` and configure:
+   - `Company Name` / `Product Name` (`Vermin Infestation`)
+   - `Package Name` (e.g. `com.yourstudio.vermininfestation`)
+   - `Orientation`: Portrait or Landscape (pick one and keep UI aligned)
+   - `Scripting Backend`: `IL2CPP`
+   - `Target Architectures`: `ARM64` (and optionally ARMv7)
+   - `Internet Access`: as required by your analytics stack
+4. In Build Settings, choose `Development Build` for debug APK.
+5. Click `Build` and output APK to a local folder.
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+## System Flow
 
-### `npm run build`
+`Input (gyro + touch)` -> `Camera/Scope` -> `WeaponController` -> `RatAIManager` -> `Score/Currency` -> `HUD/MainMenu`
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+## Runtime Architecture
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+- `GameManager` is the bootstrap entrypoint and state machine:
+  `MainMenu -> Loading -> Playing -> Paused -> Results`.
+- `PlayerProgressManager` and `SettingsManager` persist data in `Application.persistentDataPath`.
+- `LevelGenerator` + `SpawnZoneManager` configure level content and rat spawn flow.
+- `RatObjectPool` and `EffectsObjectPool` keep allocation churn low.
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+## Mobile Performance Notes
 
-### `npm run eject`
-
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
-
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
-
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+- Use object pooling for rats and hit effects (already in project).
+- Keep rat cap conservative (`RatAIManager._maxActiveRats`) for mid-range devices.
+- Avoid expensive per-frame allocations in UI and AI loops.
+- Use URP mobile quality profiles and limit dynamic lights/shadows.
+- Profile on-device with Unity Profiler before increasing spawn density.
