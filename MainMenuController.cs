@@ -14,6 +14,8 @@ namespace BarnSwarmSniper.UI
         [SerializeField] private Button _playDailyContractButton;
         [SerializeField] private Button _settingsButton;
         [SerializeField] private Button _closeSettingsButton;
+        [SerializeField] private Button _shopButton;
+        [SerializeField] private Button _closeShopButton;
         [SerializeField] private Button _exitButton;
         [SerializeField] private TextMeshProUGUI _currentLevelText;
         [SerializeField] private TextMeshProUGUI _pelletsText;
@@ -24,6 +26,7 @@ namespace BarnSwarmSniper.UI
         [Header("Panels")]
         [SerializeField] private GameObject _mainMenuPanel;
         [SerializeField] private GameObject _settingsPanel;
+        [SerializeField] private GameObject _shopPanel;
 
         [Header("Settings UI (Optional)")]
         [SerializeField] private Toggle _breathingSwayToggle;
@@ -34,15 +37,14 @@ namespace BarnSwarmSniper.UI
 
         private void Awake()
         {
-            _playButton.onClick.AddListener(OnPlayButtonClicked);
+            if (_playButton != null) _playButton.onClick.AddListener(OnPlayButtonClicked);
             if (_playStoryContractButton != null) _playStoryContractButton.onClick.AddListener(OnPlayStoryContractClicked);
             if (_playDailyContractButton != null) _playDailyContractButton.onClick.AddListener(OnPlayDailyContractClicked);
-            _settingsButton.onClick.AddListener(OnSettingsButtonClicked);
-            if (_closeSettingsButton != null)
-            {
-                _closeSettingsButton.onClick.AddListener(ShowMainMenu);
-            }
-            _exitButton.onClick.AddListener(OnExitButtonClicked);
+            if (_settingsButton != null) _settingsButton.onClick.AddListener(OnSettingsButtonClicked);
+            if (_closeSettingsButton != null) _closeSettingsButton.onClick.AddListener(ShowMainMenu);
+            if (_shopButton != null) _shopButton.onClick.AddListener(OnShopButtonClicked);
+            if (_closeShopButton != null) _closeShopButton.onClick.AddListener(ShowMainMenu);
+            if (_exitButton != null) _exitButton.onClick.AddListener(OnExitButtonClicked);
         }
 
         private void Start()
@@ -60,24 +62,23 @@ namespace BarnSwarmSniper.UI
 
         private void OnDestroy()
         {
-            _playButton.onClick.RemoveListener(OnPlayButtonClicked);
+            if (_playButton != null) _playButton.onClick.RemoveListener(OnPlayButtonClicked);
             if (_playStoryContractButton != null) _playStoryContractButton.onClick.RemoveListener(OnPlayStoryContractClicked);
             if (_playDailyContractButton != null) _playDailyContractButton.onClick.RemoveListener(OnPlayDailyContractClicked);
-            _settingsButton.onClick.RemoveListener(OnSettingsButtonClicked);
-            if (_closeSettingsButton != null)
-            {
-                _closeSettingsButton.onClick.RemoveListener(ShowMainMenu);
-            }
-            _exitButton.onClick.RemoveListener(OnExitButtonClicked);
+            if (_settingsButton != null) _settingsButton.onClick.RemoveListener(OnSettingsButtonClicked);
+            if (_closeSettingsButton != null) _closeSettingsButton.onClick.RemoveListener(ShowMainMenu);
+            if (_shopButton != null) _shopButton.onClick.RemoveListener(OnShopButtonClicked);
+            if (_closeShopButton != null) _closeShopButton.onClick.RemoveListener(ShowMainMenu);
+            if (_exitButton != null) _exitButton.onClick.RemoveListener(OnExitButtonClicked);
         }
 
         private void UpdateMainMenuUI()
         {
             if (_playerProgressManager != null && _playerProgressManager.CurrentProgress != null)
             {
-                _currentLevelText.text = $"LEVEL: {_playerProgressManager.CurrentProgress.playerLevel}";
-                _pelletsText.text = $"PELLETS: {_playerProgressManager.CurrentProgress.pelletsOwned}";
-                _opticsTierText.text = $"OPTICS TIER: {_playerProgressManager.CurrentProgress.opticsTierUnlocked + 1}";
+                if (_currentLevelText != null) _currentLevelText.text = $"LEVEL: {_playerProgressManager.CurrentProgress.playerLevel}";
+                if (_pelletsText != null) _pelletsText.text = $"PELLETS: {_playerProgressManager.CurrentProgress.pelletsOwned}";
+                if (_opticsTierText != null) _opticsTierText.text = $"OPTICS TIER: {_playerProgressManager.CurrentProgress.opticsTierUnlocked + 1}";
             }
 
             if (_gameManager != null && _gameManager.ContractManager != null)
@@ -144,6 +145,11 @@ namespace BarnSwarmSniper.UI
             ShowSettingsMenu();
         }
 
+        private void OnShopButtonClicked()
+        {
+            ShowShopMenu();
+        }
+
         private void OnExitButtonClicked()
         {
             Application.Quit();
@@ -154,30 +160,24 @@ namespace BarnSwarmSniper.UI
 
         public void ShowMainMenu()
         {
-            if (_mainMenuPanel != null)
-            {
-                _mainMenuPanel.SetActive(true);
-            }
-
-            if (_settingsPanel != null)
-            {
-                _settingsPanel.SetActive(false);
-            }
-
+            if (_mainMenuPanel != null) _mainMenuPanel.SetActive(true);
+            if (_settingsPanel != null) _settingsPanel.SetActive(false);
+            if (_shopPanel != null) _shopPanel.SetActive(false);
             UpdateMainMenuUI();
         }
 
         public void ShowSettingsMenu()
         {
-            if (_mainMenuPanel != null)
-            {
-                _mainMenuPanel.SetActive(false);
-            }
+            if (_mainMenuPanel != null) _mainMenuPanel.SetActive(false);
+            if (_settingsPanel != null) _settingsPanel.SetActive(true);
+            if (_shopPanel != null) _shopPanel.SetActive(false);
+        }
 
-            if (_settingsPanel != null)
-            {
-                _settingsPanel.SetActive(true);
-            }
+        public void ShowShopMenu()
+        {
+            if (_mainMenuPanel != null) _mainMenuPanel.SetActive(false);
+            if (_settingsPanel != null) _settingsPanel.SetActive(false);
+            if (_shopPanel != null) _shopPanel.SetActive(true);
         }
 
         public void OnBreathingSwayToggleChanged(bool enabled)

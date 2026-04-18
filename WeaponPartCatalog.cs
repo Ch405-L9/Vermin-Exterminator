@@ -6,12 +6,26 @@ namespace BarnSwarmSniper.Weapon
 {
     public enum WeaponPartCategory
     {
+        // Original categories (kept for backward compatibility with existing assets)
         Scope,
         Barrel,
         Magazine,
         Trigger,
         Stock,
-        Accessory
+        Accessory,
+        // Phase 1 additions
+        Rifle,
+        Ammo,
+        Cosmetic
+    }
+
+    public enum WeaponPartRarity
+    {
+        Common,
+        Uncommon,
+        Rare,
+        Epic,
+        Legendary
     }
 
     [Serializable]
@@ -30,6 +44,14 @@ namespace BarnSwarmSniper.Weapon
 
         [Header("Optics")]
         public int maxOpticsTierDelta = 0; // increases allowed tier index (clamped)
+        public float zoomMultiplier = 1f;  // multiplies effective zoom / divides FOV
+
+        [Header("Handling")]
+        public float swayMultiplier = 1f;          // lower = steadier
+        public float noiseRadiusMultiplier = 1f;   // lower = quieter (alerts fewer rats)
+
+        [Header("Magazine / Capacity")]
+        public int magazineSizeDelta = 0;          // additive bonus
     }
 
     [Serializable]
@@ -38,15 +60,43 @@ namespace BarnSwarmSniper.Weapon
         [Header("Identity")]
         public string id;
         public string displayName;
+        [TextArea(2, 5)] public string description;
         public WeaponPartCategory category;
+        public WeaponPartRarity rarity = WeaponPartRarity.Common;
+        public Sprite icon;
 
         [Header("Progression")]
         public int costPellets;
         public int requiredPlayerLevel = 1;
         public string[] requiresPartIds;
+        public string[] requiresContractIds; // optional: contract IDs that must have been completed
+
+        [Header("Optics (Scope parts only)")]
+        [Tooltip("For Scope parts, the OpticsTierConfig index this part unlocks/represents. -1 = n/a.")]
+        public int opticsTierIndex = -1;
 
         [Header("Effects")]
         public WeaponStatModifiers modifiers = new WeaponStatModifiers();
+
+        /// <summary>Short one-line stat preview string for list display.</summary>
+        public string GetShortStatLine()
+        {
+            if (modifiers == null) return "";
+            var parts = new List<string>(6);
+            if (!Mathf.Approximately(modifiers.fireRateMultiplier, 1f))
+                parts.Add($"Rate x{modifiers.fireRateMultiplier:0.00}");
+            if (!Mathf.Approximately(modifiers.recoilAmountMultiplier, 1f))
+                parts.Add($"Recoil x{modifiers.recoilAmountMultiplier:0.00}");
+            if (!Mathf.Approximately(modifiers.swayMultiplier, 1f))
+                parts.Add($"Sway x{modifiers.swayMultiplier:0.00}");
+            if (!Mathf.Approximately(modifiers.noiseRadiusMultiplier, 1f))
+                parts.Add($"Noise x{modifiers.noiseRadiusMultiplier:0.00}");
+            if (modifiers.magazineSizeDelta != 0)
+                parts.Add((modifiers.magazineSizeDelta > 0 ? "+" : "") + modifiers.magazineSizeDelta + " mag");
+            if (modifiers.maxOpticsTierDelta != 0)
+                parts.Add((modifiers.maxOpticsTierDelta > 0 ? "+" : "") + modifiers.maxOpticsTierDelta + " optics tier");
+            return string.Join(" | ", parts);
+        }
     }
 
     [CreateAssetMenu(fileName = "WeaponPartCatalog", menuName = "BarnSwarmSniper/Weapon Part Catalog", order = 10)]
@@ -86,6 +136,20 @@ namespace BarnSwarmSniper.Weapon
                 }
             }
         }
+
+        /// <summary>Returns all distinct categories that have at least one part defined.</summary>
+        public IEnumerable<WeaponPartCategory> GetPopulatedCategories()
+        {
+            var seen = new HashSet<WeaponPartCategory>();
+            for (int i = 0; i < parts.Count; i++)
+            {
+                var p = parts[i];
+                if (p == null) continue;
+                if (seen.Add(p.category))
+                {
+                    yield return p.category;
+                }
+            }
+        }
     }
 }
-

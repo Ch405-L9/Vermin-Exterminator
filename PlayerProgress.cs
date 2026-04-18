@@ -14,6 +14,11 @@ namespace BarnSwarmSniper.Data
         public string[] ownedPartIds = Array.Empty<string>();
         public EquippedPart[] equippedParts = Array.Empty<EquippedPart>();
 
+        // Phase 1 additions
+        public string[] seenPartIds = Array.Empty<string>();  // tracks parts the player has viewed (for "NEW" badge)
+        public string[] completedContractIds = Array.Empty<string>(); // contract completion tracking (for part prerequisites)
+        public string selectedAmmoId = string.Empty;          // current selected ammo part id (if any)
+
         [Serializable]
         public class EquippedPart
         {
@@ -30,6 +35,9 @@ namespace BarnSwarmSniper.Data
             barnVariantsUnlocked = new int[] { 0 };
             ownedPartIds = Array.Empty<string>();
             equippedParts = Array.Empty<EquippedPart>();
+            seenPartIds = Array.Empty<string>();
+            completedContractIds = Array.Empty<string>();
+            selectedAmmoId = string.Empty;
         }
     }
 }

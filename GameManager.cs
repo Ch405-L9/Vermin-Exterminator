@@ -53,7 +53,9 @@ namespace BarnSwarmSniper.Game
         public PlayerProgressManager PlayerProgressManager => _playerProgressManager;
         public SettingsManager SettingsManager => _settingsManager;
         public ContractManager ContractManager => _contractManager;
+        public WeaponPartCatalog WeaponPartCatalog => _weaponPartCatalog;
         public RuntimeSettings CurrentRuntimeSettings { get; private set; }
+        public RuntimeLoadout CurrentRuntimeLoadout { get; private set; }
 
         private float _timeRemainingSeconds;
         private bool _pendingGameStart;
@@ -220,6 +222,17 @@ namespace BarnSwarmSniper.Game
 
             _contractManager?.EndContractAndGrantReward(true);
 
+            // Record contract completion for shop-prerequisite gating.
+            if (_contractManager?.SelectedContract != null && _playerProgressManager?.CurrentProgress != null)
+            {
+                var cid = _contractManager.SelectedContract.contractId;
+                if (!string.IsNullOrWhiteSpace(cid))
+                {
+                    _playerProgressManager.CurrentProgress.MarkContractCompleted(cid);
+                    _playerProgressManager.SaveProgress();
+                }
+            }
+
             SceneManager.LoadScene(_mainMenuSceneName, LoadSceneMode.Single);
             SetState(GameState.MainMenu);
         }
@@ -274,46 +287,18 @@ namespace BarnSwarmSniper.Game
                 return;
             }
 
+            // Build a safe, immutable snapshot of the player's loadout for this session.
+            CurrentRuntimeLoadout = RuntimeLoadout.Build(
+                _playerProgressManager.CurrentProgress,
+                _weaponPartCatalog);
+
             if (_weaponPartCatalog == null)
             {
-                // Optional: leave weapon at default tuning if no catalog assigned yet.
+                // No catalog assigned: leave weapon at default tuning but still keep a (mostly empty) loadout.
                 return;
             }
 
-            var progress = _playerProgressManager.CurrentProgress;
-            var aggregate = new WeaponStatModifiers();
-
-            if (progress.equippedParts != null)
-            {
-                for (int i = 0; i < progress.equippedParts.Length; i++)
-                {
-                    var eq = progress.equippedParts[i];
-                    if (eq == null || string.IsNullOrWhiteSpace(eq.partId))
-                    {
-                        continue;
-                    }
-
-                    if (!_weaponPartCatalog.TryGetPart(eq.partId, out var part) || part == null)
-                    {
-                        continue;
-                    }
-
-                    var m = part.modifiers;
-                    if (m == null)
-                    {
-                        continue;
-                    }
-
-                    aggregate.fireRateMultiplier *= m.fireRateMultiplier;
-                    aggregate.recoilAmountMultiplier *= m.recoilAmountMultiplier;
-                    aggregate.recoilRecoveryMultiplier *= m.recoilRecoveryMultiplier;
-                    aggregate.aimAssistFrictionStrengthMultiplier *= m.aimAssistFrictionStrengthMultiplier;
-                    aggregate.aimAssistFrictionRadiusMultiplier *= m.aimAssistFrictionRadiusMultiplier;
-                    aggregate.maxOpticsTierDelta += m.maxOpticsTierDelta;
-                }
-            }
-
-            _weaponController.ApplyModifiers(aggregate);
+            _weaponController.ApplyModifiers(CurrentRuntimeLoadout.Aggregate);
         }
 
         private void ResolvePersistentReferences()

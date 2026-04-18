@@ -20,6 +20,7 @@ namespace BarnSwarmSniper.Weapon
         [SerializeField] private ScoreManager _scoreManager;
         [SerializeField] private EffectsObjectPool _effectsObjectPool;
         [SerializeField] private SettingsData _settingsData;
+        [SerializeField] private ScopeOverlayController _scopeOverlay;
 
         [Header("Weapon Settings")]
         [SerializeField] private float _fireRate = 0.5f; // Shots per second
@@ -33,6 +34,13 @@ namespace BarnSwarmSniper.Weapon
 
         private float _baseFireRate;
         private RuntimeSettings _runtimeSettings;
+        private WeaponStatModifiers _activeModifiers;
+
+        // Base (unscaled) aim-assist values captured from runtime settings so we
+        // can safely re-apply the per-tier multipliers when tier changes.
+        private float _baseAimAssistRadius;
+        private float _baseAimAssistStrength;
+        private bool _aimAssistBaseCaptured;
 
         void Start()
         {
@@ -40,19 +48,21 @@ namespace BarnSwarmSniper.Weapon
             if (_audioSource == null) _audioSource = GetComponent<AudioSource>();
             if (_audioSource == null) Debug.LogWarning("WeaponController: No AudioSource found on GameObject.");
 
-            // Initialize zoom to default tier
-            if (_opticsConfig != null && _opticsConfig.OpticsTiers.Length > 0)
+            if (_opticsConfig != null && _opticsConfig.OpticsTiers != null && _opticsConfig.OpticsTiers.Length > 0)
             {
-                _zoomController.SetZoomLevel(_currentOpticsTierIndex);
+                ApplyCurrentTier();
             }
         }
 
         public void ApplyModifiers(WeaponStatModifiers modifiers)
         {
+            _activeModifiers = modifiers;
+
             if (modifiers == null)
             {
                 _fireRate = _baseFireRate;
                 _maxAllowedOpticsTierIndex = int.MaxValue;
+                ApplyCurrentTier();
                 return;
             }
 
@@ -64,10 +74,11 @@ namespace BarnSwarmSniper.Weapon
             }
 
             EnsureRuntimeSettings();
+            CaptureAimAssistBase();
             if (_runtimeSettings != null)
             {
-                _runtimeSettings.AimAssistFrictionStrength *= modifiers.aimAssistFrictionStrengthMultiplier;
-                _runtimeSettings.AimAssistFrictionRadius *= modifiers.aimAssistFrictionRadiusMultiplier;
+                _runtimeSettings.AimAssistFrictionStrength = _baseAimAssistStrength * modifiers.aimAssistFrictionStrengthMultiplier;
+                _runtimeSettings.AimAssistFrictionRadius = _baseAimAssistRadius * modifiers.aimAssistFrictionRadiusMultiplier;
             }
 
             if (_opticsConfig != null && _opticsConfig.OpticsTiers != null)
@@ -79,15 +90,11 @@ namespace BarnSwarmSniper.Weapon
             }
 
             _currentOpticsTierIndex = Mathf.Clamp(_currentOpticsTierIndex, 0, _maxAllowedOpticsTierIndex);
-            if (_zoomController != null)
-            {
-                _zoomController.SetZoomLevel(_currentOpticsTierIndex);
-            }
+            ApplyCurrentTier();
         }
 
         public void ReceiveInput(Vector2 lookInput, bool fireInput)
         {
-            // Aim assist application (before raycast)
             Vector3 aimDirection = GetAimDirection(lookInput);
 
             if (fireInput && Time.time >= _nextFireTime)
@@ -99,18 +106,14 @@ namespace BarnSwarmSniper.Weapon
 
         private Vector3 GetAimDirection(Vector2 lookInput)
         {
-            // This is where aim assist logic would be applied to the raw lookInput
-            // For now, it just returns the camera's forward direction, potentially modified by lookInput
             Vector3 baseDirection = _cameraController.transform.forward;
             EnsureRuntimeSettings();
             float frictionRadius = _runtimeSettings != null ? _runtimeSettings.AimAssistFrictionRadius : (_settingsData != null ? _settingsData.AimAssistFrictionRadius : 0.1f);
             float frictionStrength = _runtimeSettings != null ? _runtimeSettings.AimAssistFrictionStrength : (_settingsData != null ? _settingsData.AimAssistFrictionStrength : 0.5f);
 
-            // Simple aim assist: check for nearby rats and nudge aim
             RaycastHit hit;
             if (Physics.SphereCast(_cameraController.transform.position, frictionRadius, baseDirection, out hit, 100f, _ratLayer))
             {
-                // If a rat is within the friction radius, gently pull the aim towards it
                 Vector3 targetDirection = (hit.collider.transform.position - _cameraController.transform.position).normalized;
                 baseDirection = Vector3.Lerp(baseDirection, targetDirection, frictionStrength);
             }
@@ -122,7 +125,7 @@ namespace BarnSwarmSniper.Weapon
         {
             if (_audioSource != null && _shootSound != null) _audioSource.PlayOneShot(_shootSound);
 
-            _recoilSystem.AddRecoil(new Vector3(-0.5f, Random.Range(-0.2f, 0.2f), 0f)); // Apply recoil
+            _recoilSystem.AddRecoil(new Vector3(-0.5f, Random.Range(-0.2f, 0.2f), 0f));
 
             RaycastHit hit;
             if (Physics.Raycast(_cameraController.transform.position, aimDirection, out hit, Mathf.Infinity, _ratLayer))
@@ -132,7 +135,7 @@ namespace BarnSwarmSniper.Weapon
                 if (rat != null)
                 {
                     rat.OnShot();
-                    _ratAIManager.DespawnRat(rat); // RatAIManager handles pooling and score notification
+                    _ratAIManager.DespawnRat(rat);
                     _effectsObjectPool.GetHitMarker(hit.point, Quaternion.LookRotation(hit.normal));
                     _effectsObjectPool.GetImpactDust(hit.point, Quaternion.LookRotation(hit.normal));
                 }
@@ -145,19 +148,58 @@ namespace BarnSwarmSniper.Weapon
 
         public void CycleOpticsTier()
         {
-            if (_opticsConfig != null && _opticsConfig.OpticsTiers.Length > 0)
-            {
-                int tierCount = Mathf.Min(_opticsConfig.OpticsTiers.Length, _maxAllowedOpticsTierIndex + 1);
-                tierCount = Mathf.Max(1, tierCount);
-                _currentOpticsTierIndex = (_currentOpticsTierIndex + 1) % tierCount;
-                _zoomController.SetZoomLevel(_currentOpticsTierIndex);
-                // Also update ScopeOverlayController with new mode if applicable
-            }
+            if (_opticsConfig == null || _opticsConfig.OpticsTiers == null || _opticsConfig.OpticsTiers.Length == 0) return;
+
+            int tierCount = Mathf.Min(_opticsConfig.OpticsTiers.Length, _maxAllowedOpticsTierIndex + 1);
+            tierCount = Mathf.Max(1, tierCount);
+            _currentOpticsTierIndex = (_currentOpticsTierIndex + 1) % tierCount;
+            ApplyCurrentTier();
         }
 
-        public int GetCurrentOpticsTierIndex()
+        /// <summary>Cycles the current scope mode through the modes supported by the active optics tier.</summary>
+        public void CycleScopeMode()
         {
-            return _currentOpticsTierIndex;
+            if (_scopeOverlay == null || _opticsConfig == null) return;
+            if (!_opticsConfig.TryGetTier(_currentOpticsTierIndex, out var tier) || tier == null) return;
+            if (tier.supportedScopeModes == null || tier.supportedScopeModes.Count == 0)
+            {
+                _scopeOverlay.SwitchScopeMode(tier.defaultScopeMode);
+                return;
+            }
+            _scopeOverlay.CycleMode(tier.supportedScopeModes);
+        }
+
+        public int GetCurrentOpticsTierIndex() => _currentOpticsTierIndex;
+
+        private void ApplyCurrentTier()
+        {
+            if (_opticsConfig == null || _opticsConfig.OpticsTiers == null || _opticsConfig.OpticsTiers.Length == 0) return;
+
+            _currentOpticsTierIndex = Mathf.Clamp(_currentOpticsTierIndex, 0, _opticsConfig.OpticsTiers.Length - 1);
+
+            if (_zoomController != null)
+            {
+                _zoomController.SetZoomLevel(_currentOpticsTierIndex);
+            }
+
+            if (!_opticsConfig.TryGetTier(_currentOpticsTierIndex, out var tier) || tier == null) return;
+
+            // Per-tier sway / aim-assist scaling (applied on top of equipped-part modifiers).
+            EnsureRuntimeSettings();
+            CaptureAimAssistBase();
+            if (_runtimeSettings != null)
+            {
+                float partRadiusMult = _activeModifiers != null ? _activeModifiers.aimAssistFrictionRadiusMultiplier : 1f;
+                float partStrengthMult = _activeModifiers != null ? _activeModifiers.aimAssistFrictionStrengthMultiplier : 1f;
+                _runtimeSettings.AimAssistFrictionRadius = _baseAimAssistRadius * partRadiusMult * Mathf.Max(0.0001f, tier.aimAssistConeMultiplier);
+                _runtimeSettings.AimAssistFrictionStrength = _baseAimAssistStrength * partStrengthMult;
+            }
+
+            // Scope overlay clamp to supported modes
+            if (_scopeOverlay != null)
+            {
+                _scopeOverlay.EnforceSupportedMode(tier);
+            }
         }
 
         private void EnsureRuntimeSettings()
@@ -172,6 +214,14 @@ namespace BarnSwarmSniper.Weapon
             {
                 _runtimeSettings = RuntimeSettings.FromSettingsData(_settingsData);
             }
+        }
+
+        private void CaptureAimAssistBase()
+        {
+            if (_aimAssistBaseCaptured || _runtimeSettings == null) return;
+            _baseAimAssistRadius = _runtimeSettings.AimAssistFrictionRadius;
+            _baseAimAssistStrength = _runtimeSettings.AimAssistFrictionStrength;
+            _aimAssistBaseCaptured = true;
         }
     }
 }
