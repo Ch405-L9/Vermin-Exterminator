@@ -1,0 +1,31 @@
+﻿using UnityEngine;
+using System.Collections.Generic;
+
+namespace BarnSwarmSniper.Level
+{
+    [CreateAssetMenu(fileName = "EnvironmentTileLibrary", menuName = "BarnSwarmSniper/Environment Tile Library", order = 2)]
+    public class EnvironmentTileLibrary : ScriptableObject
+    {
+        [System.Serializable]
+        public class TileGroup
+        {
+            public string groupName;
+            public List<GameObject> tiles;
+        }
+
+        public List<TileGroup> tileGroups;
+
+        public GameObject GetRandomTileFromGroup(string groupName)
+        {
+            foreach (TileGroup group in tileGroups)
+            {
+                if (group.groupName == groupName && group.tiles.Count > 0)
+                {
+                    return group.tiles[Random.Range(0, group.tiles.Count)];
+                }
+            }
+            Debug.LogWarning($"No tiles found for group: {groupName}");
+            return null;
+        }
+    }
+}

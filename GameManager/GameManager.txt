@@ -1,0 +1,124 @@
+﻿using UnityEngine;
+using UnityEngine.SceneManagement;
+using BarnSwarmSniper.Data;
+using BarnSwarmSniper.Scoring;
+using BarnSwarmSniper.Level;
+using BarnSwarmSniper.AI;
+
+namespace BarnSwarmSniper.Game
+{
+    public class GameManager : MonoBehaviour
+    {
+        public static GameManager Instance { get; private set; }
+
+        [Header("Managers")]
+        [SerializeField] private PlayerProgressManager _playerProgressManager;
+        [SerializeField] private SettingsManager _settingsManager;
+        [SerializeField] private ScoreManager _scoreManager;
+        [SerializeField] private CurrencyManager _currencyManager;
+        [SerializeField] private LevelGenerator _levelGenerator;
+        [SerializeField] private RatAIManager _ratAIManager;
+
+        [Header("Game Settings")]
+        [SerializeField] private float _levelDuration = 120f; // 2 minutes per level
+
+        private float _currentLevelTimer;
+        private bool _isGameActive = false;
+
+        void Awake()
+        {
+            if (Instance != null && Instance != this)
+            {
+                Destroy(gameObject);
+            }
+            else
+            {
+                Instance = this;
+                DontDestroyOnLoad(gameObject);
+            }
+        }
+
+        void Start()
+        {
+            // Initialize managers
+            _playerProgressManager.LoadProgress();
+            _settingsManager.LoadSettings();
+
+            // Subscribe to events
+            _scoreManager.OnScoreChanged += HandleScoreChanged;
+            _scoreManager.OnMiss += HandleMiss;
+            _currencyManager.OnPelletsChanged += HandlePelletsChanged;
+            _ratAIManager.OnRatKilled += _scoreManager.OnRatKilled;
+
+            // Load Main Menu scene initially
+            SceneManager.LoadScene("MainMenu");
+        }
+
+        void Update()
+        {
+            if (_isGameActive)
+            {
+                _currentLevelTimer -= Time.deltaTime;
+                if (_currentLevelTimer <= 0)
+                {
+                    EndLevel();
+                }
+            }
+        }
+
+        public void StartGame()
+        {
+            SceneManager.LoadScene("Game");
+            _isGameActive = true;
+            _currentLevelTimer = _levelDuration;
+            _scoreManager.CurrentScore = 0; // Reset score for new game
+            // Generate a new level
+            _levelGenerator.GenerateLevel(_playerProgressManager.CurrentProgress.playerLevel, SystemInfo.deviceUniqueIdentifier);
+        }
+
+        public void EndLevel()
+        {
+            _isGameActive = false;
+            _currencyManager.ConvertScoreToPellets(_scoreManager.CurrentScore);
+            _playerProgressManager.SaveProgress();
+            // Transition to a results screen or back to main menu
+            SceneManager.LoadScene("MainMenu");
+        }
+
+        private void HandleScoreChanged(int newScore)
+        {
+            // Update UI or perform other actions based on score change
+            Debug.Log($"Score changed: {newScore}");
+        }
+
+        private void HandleMiss()
+        {
+            // Handle miss event, e.g., reset combo
+            Debug.Log("Player missed a shot.");
+        }
+
+        private void HandlePelletsChanged(int newPellets)
+        {
+            // Update UI or perform other actions based on pellet change
+            Debug.Log($"Pellets owned: {newPellets}");
+        }
+
+        void OnDestroy()
+        {
+            // Unsubscribe from events to prevent memory leaks
+            if (_scoreManager != null)
+            {
+                _scoreManager.OnScoreChanged -= HandleScoreChanged;
+                _scoreManager.OnMiss -= HandleMiss;
+            }
+            if (_currencyManager != null)
+            {
+                _currencyManager.OnPelletsChanged -= HandlePelletsChanged;
+            }
+            if (_ratAIManager != null)
+            {
+                _ratAIManager.OnRatKilled -= _scoreManager.OnRatKilled;
+            }
+        }
+    }
+}
