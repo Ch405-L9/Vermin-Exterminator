@@ -31,8 +31,8 @@ namespace BarnSwarmSniper.UI
         [SerializeField] private ScopeVolumeProfileSet _profileSet;
         [SerializeField] private float _volumeWeightOn = 1f;
 
-        [Header("Scope Modes")]
         public enum ScopeMode { Daylight, NightVision, ThermalWhiteHot, ThermalGreen }
+        [Header("Scope Modes")]
         [SerializeField] private ScopeMode _defaultScopeMode = ScopeMode.Daylight;
 
         private ScopeMode _currentScopeMode = ScopeMode.Daylight;

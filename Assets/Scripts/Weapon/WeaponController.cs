@@ -2,6 +2,7 @@ using UnityEngine;
 using BarnSwarmSniper.Input;
 using BarnSwarmSniper.Camera;
 using BarnSwarmSniper.AI;
+using BarnSwarmSniper.Pooling;
 using BarnSwarmSniper.Scoring;
 using BarnSwarmSniper.UI;
 using BarnSwarmSniper.Data;
